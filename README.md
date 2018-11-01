@@ -1,6 +1,6 @@
 # faasflow-minio-statemanager
-A faasflow statemanager implementation that uses minio DB to store state  
-And can also be used with s3 alternatively
+A **[faasflow](https://github.com/s8sg/faasflow)** statemanager implementation that uses minio DB to store state  
+which can also be used with s3 bucket
 
 ## Getting Stated
 
