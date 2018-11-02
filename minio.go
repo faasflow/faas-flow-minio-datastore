@@ -40,6 +40,7 @@ func GetMinioStateManager() (faasflow.StateManager, error) {
 
 	minioStateManager.bucketName = bucketName
 	minioStateManager.flowName = flowName
+	minioStateManager.minioClient = minioClient
 
 	return minioStateManager, nil
 }
@@ -51,7 +52,7 @@ func (minioState *MinioStateManager) Set(key string, value string) error {
 
 	fullPath := getPath(minioState.bucketName, minioState.flowName, key)
 	reader := bytes.NewReader([]byte(value))
-	n, err := minioState.minioClient.PutObject(minioState.bucketName,
+	_, err := minioState.minioClient.PutObject(minioState.bucketName,
 		fullPath,
 		reader,
 		int64(reader.Len()),
@@ -59,6 +60,7 @@ func (minioState *MinioStateManager) Set(key string, value string) error {
 	if err != nil {
 		return fmt.Errorf("error writing: %s, error: %s", fullPath, err.Error())
 	}
+
 	return nil
 }
 
