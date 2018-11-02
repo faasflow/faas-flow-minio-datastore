@@ -49,6 +49,32 @@ minio/minio:latest server /export
 ```
 > Note: For debugging and testing. You can expose the port of Minio with docker service update minio --publish-add 9000:9000, but this is not recommended on the public internet.
 
-### Use Minio statemanager in `faasflow`
+### Use Minio stateManager in `faasflow`
+* Set the `stack.yml` with the necessary environments
+```yaml
+      s3_url: "minio:9000"
+      s3_bucket: "faasflow"
+      s3_tls: false
+      secret_mount_path: "/var/run/secrets/"
+    secrets:
+      - s3-secret-key
+      - s3-access-key
+```
+* Use the `faasflowMinioStateManager` as a StateManager
+```go
+minioStateManager "github.com/s8sg/faasflowMinioStateManager"
 
-### Using s3 as a statemanager in `faasflow`
+func Define(flow *faasflow.Workflow, context *faasflow.Context) (err error) {
+ 
+       // initialize minio StateManager
+       miniosm, err := minioStateManager.GetMinioStateManager()
+       if err != nil {
+               return err
+       }
+       // Set StateManager
+       context.SetStateManager(miniosm)
+       
+       // Define pipeline
+       ...
+}
+```
