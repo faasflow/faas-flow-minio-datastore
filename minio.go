@@ -15,6 +15,7 @@ import (
 type MinioStateManager struct {
 	bucketName  string
 	flowName    string
+	requestId   string
 	minioClient *minio.Client
 }
 
@@ -26,10 +27,6 @@ func GetMinioStateManager() (faasflow.StateManager, error) {
 
 	region := regionName()
 	bucketName := bucketName()
-	flowName := flowName()
-	if len(flowName) == 0 {
-		return nil, fmt.Errorf("Failed to initialize minio, workflow name must be specified")
-	}
 
 	minioClient, connectErr := connectToMinio(region)
 	if connectErr != nil {
@@ -37,12 +34,18 @@ func GetMinioStateManager() (faasflow.StateManager, error) {
 	}
 
 	minioClient.MakeBucket(bucketName, region)
-
 	minioStateManager.bucketName = bucketName
-	minioStateManager.flowName = flowName
+
 	minioStateManager.minioClient = minioClient
 
 	return minioStateManager, nil
+}
+
+func (minioState *MinioStateManager) Init(flowName string, requestId string) error {
+	minioState.flowName = flowName
+	minioState.requestId = requestId
+
+	return nil
 }
 
 func (minioState *MinioStateManager) Set(key string, value string) error {
@@ -50,7 +53,7 @@ func (minioState *MinioStateManager) Set(key string, value string) error {
 		return fmt.Errorf("minio client not initialized, use GetMinioStateManager()")
 	}
 
-	fullPath := getPath(minioState.bucketName, minioState.flowName, key)
+	fullPath := getPath(minioState.bucketName, minioState.flowName, minioState.requestId, key)
 	reader := bytes.NewReader([]byte(value))
 	_, err := minioState.minioClient.PutObject(minioState.bucketName,
 		fullPath,
@@ -69,7 +72,7 @@ func (minioState *MinioStateManager) Get(key string) (string, error) {
 		return "", fmt.Errorf("minio client not initialized, use GetMinioStateManager()")
 	}
 
-	fullPath := getPath(minioState.bucketName, minioState.flowName, key)
+	fullPath := getPath(minioState.bucketName, minioState.flowName, minioState.requestId, key)
 	obj, err := minioState.minioClient.GetObject(minioState.bucketName, fullPath, minio.GetObjectOptions{})
 	if err != nil {
 		return "", fmt.Errorf("error reading: %s, error: %s", fullPath, err.Error())
@@ -85,7 +88,7 @@ func (minioState *MinioStateManager) Del(key string) error {
 		return fmt.Errorf("minio client not initialized, use GetMinioStateManager()")
 	}
 
-	fullPath := getPath(minioState.bucketName, minioState.flowName, key)
+	fullPath := getPath(minioState.bucketName, minioState.flowName, minioState.requestId, key)
 	err := minioState.minioClient.RemoveObject(minioState.bucketName, fullPath)
 	if err != nil {
 		return fmt.Errorf("error removing: %s, error: %s", fullPath, err.Error())
@@ -120,10 +123,10 @@ func connectToMinio(region string) (*minio.Client, error) {
 	return minio.New(endpoint, accessKey, secretKey, tlsEnabled)
 }
 
-// getPath produces a string such as pipeline/
-func getPath(bucket string, flowName string, key string) string {
+// getPath produces a string as <bucketname>/<flowname>/<requestId>/<key>.value
+func getPath(bucket, flowName, requestId, key string) string {
 	fileName := fmt.Sprintf("%s.value", key)
-	return fmt.Sprintf("%s/%s/%s", bucket, flowName, fileName)
+	return fmt.Sprintf("%s/%s/%s/%s", bucket, flowName, requestId, fileName)
 }
 
 func tlsEnabled() bool {
@@ -140,14 +143,6 @@ func bucketName() string {
 		log.Printf("Bucket name not found, set to default: %v\n", bucketName)
 	}
 	return bucketName
-}
-
-func flowName() string {
-	flowName, exist := os.LookupEnv("workflow_name")
-	if exist == false || len(flowName) == 0 {
-		flowName = ""
-	}
-	return flowName
 }
 
 func regionName() string {
