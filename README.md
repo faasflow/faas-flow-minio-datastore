@@ -55,7 +55,6 @@ minio/minio:latest server /export
       s3_url: "minio:9000"
       s3_bucket: "faasflow"
       s3_tls: false
-      secret_mount_path: "/var/run/secrets/"
     secrets:
       - s3-secret-key
       - s3-access-key
