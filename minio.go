@@ -117,8 +117,11 @@ func connectToMinio(region string) (*minio.Client, error) {
 
 	tlsEnabled := tlsEnabled()
 
-	secretKey, _ := readSecret("s3-secret-key")
-	accessKey, _ := readSecret("s3-access-key")
+	secretKey, err := readSecret("s3-secret-key")
+	accessKey, err := readSecret("s3-access-key")
+	if err != nil {
+		return nil, err
+	}
 
 	return minio.New(endpoint, accessKey, secretKey, tlsEnabled)
 }
