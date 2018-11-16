@@ -14,20 +14,36 @@ import (
 type MinioDataStore struct {
 	region      string
 	bucketName  string
-	flowName    string
-	requestId   string
 	minioClient *minio.Client
 }
 
 // GetMinioDataStore Initialize a minio DataStore object based on configuration
-// Depends on s3_url, s3-secret-key, s3-access-key, [s3_bucket, s3_region](optional), workflow_name
-func GetMinioDataStore() (faasflow.DataStore, error) {
+// Depends on s3_url, s3-secret-key, s3-access-key, s3_region(optional), workflow_name
+func GetFromEnv() (faasflow.DataStore, error) {
 
 	minioDataStore := &MinioDataStore{}
 
 	minioDataStore.region = regionName()
 
-	minioClient, connectErr := connectToMinio(minioDataStore.region)
+	endpoint := os.Getenv("s3_url")
+
+	tlsEnabled := tlsEnabled()
+
+	minioClient, connectErr := connectToMinio(endpoint, "s3-secret-key", "s3-access-key", tlsEnabled)
+	if connectErr != nil {
+		return nil, fmt.Errorf("Failed to initialize minio, error %s", connectErr.Error())
+	}
+	minioDataStore.minioClient = minioClient
+
+	return minioDataStore, nil
+}
+
+func Get(endpoint, region, secretKeySecret, accessKeySecret string, tlsEnabled bool) (faasflow.DataStore, error) {
+	minioDataStore := &MinioDataStore{}
+
+	minioDataStore.region = region
+
+	minioClient, connectErr := connectToMinio(endpoint, secretKeySecret, accessKeySecret, tlsEnabled)
 	if connectErr != nil {
 		return nil, fmt.Errorf("Failed to initialize minio, error %s", connectErr.Error())
 	}
@@ -40,9 +56,6 @@ func (minioStore *MinioDataStore) Init(flowName string, requestId string) error 
 	if minioStore.minioClient == nil {
 		return fmt.Errorf("minio client not initialized, use GetMinioDataStore()")
 	}
-
-	minioStore.flowName = flowName
-	minioStore.requestId = requestId
 
 	bucketName := fmt.Sprintf("faasflow-%s-%s", flowName, requestId)
 
@@ -126,14 +139,10 @@ func readSecret(key string) (string, error) {
 	return val, nil
 }
 
-func connectToMinio(region string) (*minio.Client, error) {
+func connectToMinio(endpoint, secretKeySecret, accessKeySecret string, tlsEnabled bool) (*minio.Client, error) {
 
-	endpoint := os.Getenv("s3_url")
-
-	tlsEnabled := tlsEnabled()
-
-	secretKey, err := readSecret("s3-secret-key")
-	accessKey, err := readSecret("s3-access-key")
+	secretKey, err := readSecret(secretKeySecret)
+	accessKey, err := readSecret(accessKeySecret)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +150,7 @@ func connectToMinio(region string) (*minio.Client, error) {
 	return minio.New(endpoint, accessKey, secretKey, tlsEnabled)
 }
 
-// getPath produces a string as <bucketname>/<flowname>/<requestId>/<key>.value
+// getPath produces a string as <bucketname>/key/<key>.value
 func getPath(bucket, key string) string {
 	fileName := fmt.Sprintf("%s.value", key)
 	return fmt.Sprintf("%s/key/%s", bucket, fileName)
