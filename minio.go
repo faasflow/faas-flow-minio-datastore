@@ -1,4 +1,4 @@
-package faasflowMinioDataStore
+package MinioDataStore
 
 import (
 	"bytes"
@@ -6,13 +6,13 @@ import (
 	minio "github.com/minio/minio-go"
 	faasflow "github.com/s8sg/faasflow"
 	"io/ioutil"
-	"log"
 	"os"
 	"path"
 	"strings"
 )
 
 type MinioDataStore struct {
+	region      string
 	bucketName  string
 	flowName    string
 	requestId   string
@@ -25,25 +25,32 @@ func GetMinioDataStore() (faasflow.DataStore, error) {
 
 	minioDataStore := &MinioDataStore{}
 
-	region := regionName()
-	bucketName := bucketName()
+	minioDataStore.region = regionName()
 
-	minioClient, connectErr := connectToMinio(region)
+	minioClient, connectErr := connectToMinio(minioDataStore.region)
 	if connectErr != nil {
 		return nil, fmt.Errorf("Failed to initialize minio, error %s", connectErr.Error())
 	}
-
-	minioClient.MakeBucket(bucketName, region)
-	minioDataStore.bucketName = bucketName
-
 	minioDataStore.minioClient = minioClient
 
 	return minioDataStore, nil
 }
 
 func (minioStore *MinioDataStore) Init(flowName string, requestId string) error {
+	if minioStore.minioClient == nil {
+		return fmt.Errorf("minio client not initialized, use GetMinioDataStore()")
+	}
+
 	minioStore.flowName = flowName
 	minioStore.requestId = requestId
+
+	bucketName := fmt.Sprintf("faasflow-%s-%s", flowName, requestId)
+
+	minioStore.bucketName = bucketName
+	err := minioStore.minioClient.MakeBucket(bucketName, minioStore.region)
+	if err != nil {
+		return fmt.Errorf("error creating: %s, error: %s", minioStore.bucketName, err.Error())
+	}
 
 	return nil
 }
@@ -53,7 +60,7 @@ func (minioStore *MinioDataStore) Set(key string, value string) error {
 		return fmt.Errorf("minio client not initialized, use GetMinioDataStore()")
 	}
 
-	fullPath := getPath(minioStore.bucketName, minioStore.flowName, minioStore.requestId, key)
+	fullPath := getPath(minioStore.bucketName, key)
 	reader := bytes.NewReader([]byte(value))
 	_, err := minioStore.minioClient.PutObject(minioStore.bucketName,
 		fullPath,
@@ -72,7 +79,7 @@ func (minioStore *MinioDataStore) Get(key string) (string, error) {
 		return "", fmt.Errorf("minio client not initialized, use GetMinioDataStore()")
 	}
 
-	fullPath := getPath(minioStore.bucketName, minioStore.flowName, minioStore.requestId, key)
+	fullPath := getPath(minioStore.bucketName, key)
 	obj, err := minioStore.minioClient.GetObject(minioStore.bucketName, fullPath, minio.GetObjectOptions{})
 	if err != nil {
 		return "", fmt.Errorf("error reading: %s, error: %s", fullPath, err.Error())
@@ -88,10 +95,18 @@ func (minioStore *MinioDataStore) Del(key string) error {
 		return fmt.Errorf("minio client not initialized, use GetMinioDataStore()")
 	}
 
-	fullPath := getPath(minioStore.bucketName, minioStore.flowName, minioStore.requestId, key)
+	fullPath := getPath(minioStore.bucketName, key)
 	err := minioStore.minioClient.RemoveObject(minioStore.bucketName, fullPath)
 	if err != nil {
 		return fmt.Errorf("error removing: %s, error: %s", fullPath, err.Error())
+	}
+	return nil
+}
+
+func (minioStore *MinioDataStore) Cleanup() error {
+	err := minioStore.minioClient.RemoveBucket(minioStore.bucketName)
+	if err != nil {
+		return fmt.Errorf("error removing: %s, error: %s", minioStore.bucketName, err.Error())
 	}
 	return nil
 }
@@ -127,9 +142,9 @@ func connectToMinio(region string) (*minio.Client, error) {
 }
 
 // getPath produces a string as <bucketname>/<flowname>/<requestId>/<key>.value
-func getPath(bucket, flowName, requestId, key string) string {
+func getPath(bucket, key string) string {
 	fileName := fmt.Sprintf("%s.value", key)
-	return fmt.Sprintf("%s/%s/%s/%s", bucket, flowName, requestId, fileName)
+	return fmt.Sprintf("%s/key/%s", bucket, fileName)
 }
 
 func tlsEnabled() bool {
@@ -137,15 +152,6 @@ func tlsEnabled() bool {
 		return true
 	}
 	return false
-}
-
-func bucketName() string {
-	bucketName, exist := os.LookupEnv("s3_bucket")
-	if exist == false || len(bucketName) == 0 {
-		bucketName = "pipeline"
-		log.Printf("Bucket name not found, set to default: %v\n", bucketName)
-	}
-	return bucketName
 }
 
 func regionName() string {
