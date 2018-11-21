@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	minio "github.com/minio/minio-go"
-	faasflow "github.com/s8sg/faasflow"
+	faasflow "github.com/s8sg/faas-flow"
 	"io/ioutil"
 	"os"
 	"path"
