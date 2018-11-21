@@ -53,7 +53,6 @@ minio/minio:latest server /export
 * Set the `stack.yml` with the necessary environments
 ```yaml
       s3_url: "minio:9000"
-      s3_bucket: "faasflow"
       s3_tls: false
     secrets:
       - s3-secret-key
