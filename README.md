@@ -58,21 +58,18 @@ minio/minio:latest server /export
       - s3-secret-key
       - s3-access-key
 ```
-* Use the `faasflowMinioDataStore` as a DataStore
+* Use the `faasflowMinioDataStore` as a DataStore on `handler.go`
 ```go
 minioDataStore "github.com/s8sg/faas-flow-minio-datastore"
 
-func Define(flow *faasflow.Workflow, context *faasflow.Context) (err error) {
- 
+func DefineDataStore() (faasflow.DataStore, error) {
+
        // initialize minio DataStore
-       miniods, err := minioDataStore.GetMinioDataStore()
+       miniods, err := minioDataStore.InitFromEnv()
        if err != nil {
-               return err
+               return nil, err
        }
-       // Set DataStore
-       context.SetDataStore(miniods)
-       
-       // Define pipeline
-       ...
+
+       return miniods, nil
 }
 ```

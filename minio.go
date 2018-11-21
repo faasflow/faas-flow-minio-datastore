@@ -17,9 +17,9 @@ type MinioDataStore struct {
 	minioClient *minio.Client
 }
 
-// GetMinioDataStore Initialize a minio DataStore object based on configuration
+// InitFromEnv Initialize a minio DataStore object based on configuration
 // Depends on s3_url, s3-secret-key, s3-access-key, s3_region(optional), workflow_name
-func GetFromEnv() (faasflow.DataStore, error) {
+func InitFromEnv() (faasflow.DataStore, error) {
 
 	minioDataStore := &MinioDataStore{}
 
@@ -38,12 +38,14 @@ func GetFromEnv() (faasflow.DataStore, error) {
 	return minioDataStore, nil
 }
 
-func Get(endpoint, region, secretKeySecret, accessKeySecret string, tlsEnabled bool) (faasflow.DataStore, error) {
+// InitFromEnv Initialize a minio DataStore object based on configuration
+// Depends on s3_url, s3-secret-key, s3-access-key, s3_region(optional), workflow_name
+func Init(endpoint, region, secretKeySecretPath, accessKeySecretPath string, tlsEnabled bool) (faasflow.DataStore, error) {
 	minioDataStore := &MinioDataStore{}
 
 	minioDataStore.region = region
 
-	minioClient, connectErr := connectToMinio(endpoint, secretKeySecret, accessKeySecret, tlsEnabled)
+	minioClient, connectErr := connectToMinio(endpoint, secretKeySecretPath, accessKeySecretPath, tlsEnabled)
 	if connectErr != nil {
 		return nil, fmt.Errorf("Failed to initialize minio, error %s", connectErr.Error())
 	}
@@ -139,10 +141,10 @@ func readSecret(key string) (string, error) {
 	return val, nil
 }
 
-func connectToMinio(endpoint, secretKeySecret, accessKeySecret string, tlsEnabled bool) (*minio.Client, error) {
+func connectToMinio(endpoint, secretKeySecretPath, accessKeySecretPath string, tlsEnabled bool) (*minio.Client, error) {
 
-	secretKey, err := readSecret(secretKeySecret)
-	accessKey, err := readSecret(accessKeySecret)
+	secretKey, err := readSecret(secretKeySecretPath)
+	accessKey, err := readSecret(accessKeySecretPath)
 	if err != nil {
 		return nil, err
 	}
