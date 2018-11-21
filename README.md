@@ -60,7 +60,7 @@ minio/minio:latest server /export
 ```
 * Use the `faasflowMinioDataStore` as a DataStore
 ```go
-minioDataStore "github.com/s8sg/faasflow-minio-datastore"
+minioDataStore "github.com/s8sg/faas-flow-minio-datastore"
 
 func Define(flow *faasflow.Workflow, context *faasflow.Context) (err error) {
  
