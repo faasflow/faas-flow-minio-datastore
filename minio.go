@@ -73,13 +73,13 @@ func (minioStore *MinioDataStore) Init() error {
 	return nil
 }
 
-func (minioStore *MinioDataStore) Set(key string, value string) error {
+func (minioStore *MinioDataStore) Set(key string, value []byte) error {
 	if minioStore.minioClient == nil {
 		return fmt.Errorf("minio client not initialized, use GetMinioDataStore()")
 	}
 
 	fullPath := getPath(minioStore.bucketName, key)
-	reader := bytes.NewReader([]byte(value))
+	reader := bytes.NewReader(value)
 	_, err := minioStore.minioClient.PutObject(minioStore.bucketName,
 		fullPath,
 		reader,
@@ -92,20 +92,20 @@ func (minioStore *MinioDataStore) Set(key string, value string) error {
 	return nil
 }
 
-func (minioStore *MinioDataStore) Get(key string) (string, error) {
+func (minioStore *MinioDataStore) Get(key string) ([]byte, error) {
 	if minioStore.minioClient == nil {
-		return "", fmt.Errorf("minio client not initialized, use GetMinioDataStore()")
+		return nil, fmt.Errorf("minio client not initialized, use GetMinioDataStore()")
 	}
 
 	fullPath := getPath(minioStore.bucketName, key)
 	obj, err := minioStore.minioClient.GetObject(minioStore.bucketName, fullPath, minio.GetObjectOptions{})
 	if err != nil {
-		return "", fmt.Errorf("error reading: %s, error: %s", fullPath, err.Error())
+		return nil, fmt.Errorf("error reading: %s, error: %s", fullPath, err.Error())
 	}
 
 	data, _ := ioutil.ReadAll(obj)
 
-	return string(data), nil
+	return data, nil
 }
 
 func (minioStore *MinioDataStore) Del(key string) error {
